@@ -1,0 +1,450 @@
+{
+	"info": {
+		"_postman_id": "67260afe-8704-40b0-add4-a64d82a30555",
+		"name": "Smart Parking System",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "39499556"
+	},
+	"item": [
+		{
+			"name": "Parking Spot",
+			"item": [
+				{
+					"name": "http://localhost:8080/api/spots",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/api/spots",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"spots"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "http://localhost:8080/api/spots/1",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "http://localhost:8080/api/spots/14",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"spots",
+								"14"
+							]
+						},
+						"description": "Generated from cURL: curl -X GET \"http://localhost:8080/api/spots/1\" -H \"Accept: application/json\"\r\n"
+					},
+					"response": []
+				},
+				{
+					"name": "http://localhost:8080/api/spots/1",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/api/spots/1",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"spots",
+								"1"
+							]
+						},
+						"description": "Generated from cURL: curl -X DELETE \"http://localhost:8080/api/spots/1\"\r\n"
+					},
+					"response": []
+				},
+				{
+					"name": "http://localhost:8080/api/spots",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n        \"code\": \"C5\",\r\n        \"vehicleType\": \"BIKE\",\r\n        \"status\": \"AVAILABLE\",\r\n        \"level\": 1,\r\n        \"occupied\": false\r\n      }",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/spots",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"spots"
+							]
+						},
+						"description": "Generated from cURL: curl -X POST \"http://localhost:8080/api/spots\" \\\r\n  -H \"Content-Type: application/json\" \\\r\n  -d '{\r\n        \"code\": \"A1\",\r\n        \"vehicleType\": \"CAR\",\r\n        \"status\": \"AVAILABLE\",\r\n        \"level\": 1,\r\n        \"occupied\": false\r\n      }'\r\n"
+					},
+					"response": []
+				},
+				{
+					"name": "http://localhost:8080/api/spots/available/first?vehicleType=CAR",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "http://localhost:8080/api/spots/available/first?vehicleType=CAR",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"spots",
+								"available",
+								"first"
+							],
+							"query": [
+								{
+									"key": "vehicleType",
+									"value": "CAR"
+								}
+							]
+						},
+						"description": "Generated from cURL: curl -X GET \"http://localhost:8080/api/spots/available/first?vehicleType=CAR\" \\\r\n  -H \"Accept: application/json\"\r\n"
+					},
+					"response": []
+				},
+				{
+					"name": "http://localhost:8080/api/spots/available/count",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "http://localhost:8080/api/spots/available/count",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"spots",
+								"available",
+								"count"
+							]
+						},
+						"description": "Generated from cURL: curl -X GET \"http://localhost:8080/api/spots/available/count\" \\\r\n  -H \"Accept: application/json\"\r\n"
+					},
+					"response": []
+				},
+				{
+					"name": "http://localhost:8080/api/spots/available/count-by-type?vehicleType=BIKE",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "http://localhost:8080/api/spots/available/count-by-type?vehicleType=BIKE",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"spots",
+								"available",
+								"count-by-type"
+							],
+							"query": [
+								{
+									"key": "vehicleType",
+									"value": "BIKE"
+								}
+							]
+						},
+						"description": "Generated from cURL: curl -X GET \"http://localhost:8080/api/spots/available/count-by-type?vehicleType=BIKE\" \\\r\n  -H \"Accept: application/json\"\r\n"
+					},
+					"response": []
+				},
+				{
+					"name": "http://localhost:8080/api/spots/1",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n        \"code\": \"A1\",\r\n        \"vehicleType\": \"CAR\",\r\n        \"status\": \"OCCUPIED\",\r\n        \"level\": 1,\r\n        \"occupied\": true\r\n      }",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/spots/1",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"spots",
+								"1"
+							]
+						},
+						"description": "Generated from cURL: curl -X PUT \"http://localhost:8080/api/spots/1\" \\\r\n  -H \"Content-Type: application/json\" \\\r\n  -d '{\r\n        \"code\": \"A1\",\r\n        \"vehicleType\": \"CAR\",\r\n        \"status\": \"OCCUPIED\",\r\n        \"level\": 1,\r\n        \"occupied\": true\r\n      }'\r\n"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Parking",
+			"item": [
+				{
+					"name": "http://localhost:8080/api/parking/entry?allocationStrategy=NearestFirst",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"vehicleNumber\": \"MH12AB1234\",\r\n    \"vehicleType\": \"CAR\"\r\n  }",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/parking/entry?allocationStrategy=NearestFirst",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"parking",
+								"entry"
+							],
+							"query": [
+								{
+									"key": "allocationStrategy",
+									"value": "NearestFirst"
+								}
+							]
+						},
+						"description": "Generated from cURL: curl -X POST \"http://localhost:8080/api/parking/entry?allocationStrategy=NearestFirst\" \\\r\n  -H \"Content-Type: application/json\" \\\r\n  -d '{\r\n    \"vehicleNumber\": \"MH12AB1234\",\r\n    \"vehicleType\": \"CAR\"\r\n  }'\r\n"
+					},
+					"response": []
+				},
+				{
+					"name": "http://localhost:8080/api/parking/availability",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/api/parking/availability",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"parking",
+								"availability"
+							]
+						},
+						"description": "Generated from cURL: curl -X GET \"http://localhost:8080/api/parking/availability\""
+					},
+					"response": []
+				},
+				{
+					"name": "http://localhost:8080/api/parking/availability?vehicleType=CAR",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/api/parking/availability?vehicleType=CAR",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"parking",
+								"availability"
+							],
+							"query": [
+								{
+									"key": "vehicleType",
+									"value": "CAR"
+								}
+							]
+						},
+						"description": "Generated from cURL: curl -X GET \"http://localhost:8080/api/parking/availability?vehicleType=CAR\""
+					},
+					"response": []
+				},
+				{
+					"name": "http://localhost:8080/api/parking/availability/count",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/api/parking/availability/count",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"parking",
+								"availability",
+								"count"
+							]
+						},
+						"description": "Generated from cURL: curl -X GET \"http://localhost:8080/api/parking/availability/count\""
+					},
+					"response": []
+				},
+				{
+					"name": "http://localhost:8080/api/parking/availability/count?vehicleType=MOTORCYCLE",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/api/parking/availability/count?vehicleType=MOTORCYCLE",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"parking",
+								"availability",
+								"count"
+							],
+							"query": [
+								{
+									"key": "vehicleType",
+									"value": "MOTORCYCLE"
+								}
+							]
+						},
+						"description": "Generated from cURL: curl -X GET \"http://localhost:8080/api/parking/availability/count?vehicleType=MOTORCYCLE\""
+					},
+					"response": []
+				},
+				{
+					"name": "http://localhost:8080/api/parking/exit?pricingStrategy=HourlyPricingStrategy",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"vehicleNumber\": \"MH12AB1234\"\r\n  }",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/parking/exit?pricingStrategy=HourlyPricingStrategy",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"parking",
+								"exit"
+							],
+							"query": [
+								{
+									"key": "pricingStrategy",
+									"value": "HourlyPricingStrategy"
+								}
+							]
+						},
+						"description": "Generated from cURL: curl -X POST \"http://localhost:8080/api/parking/exit?pricingStrategy=HourlyPricingStrategy\" \\\r\n  -H \"Content-Type: application/json\" \\\r\n  -d '{\r\n    \"vehicleNumber\": \"MH12AB1234\"\r\n  }'\r\n"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "New Request",
+			"request": {
+				"method": "GET",
+				"header": []
+			},
+			"response": []
+		}
+	]
+}
