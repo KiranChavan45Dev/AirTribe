@@ -1,11 +1,56 @@
+# ===============================
+# Java / Spring Boot
+# ===============================
+/target/
+*.jar
+*.war
+*.ear
+*.class
+hs_err_pid*
+
+# Logs
+*.log
+logs/
+
+# ===============================
+# Maven / Gradle
+# ===============================
+.mvn/wrapper/maven-wrapper.jar
+.gradle/
+build/
+
+# ===============================
 # VS Code
+# ===============================
 .vscode/
 
+# ===============================
 # IntelliJ IDEA
+# ===============================
 .idea/
 *.iml
+*.iws
+*.ipr
+out/
 
+# ===============================
 # Eclipse
+# ===============================
 .project
 .classpath
 .settings/
+
+# ===============================
+# OS files
+# ===============================
+.DS_Store
+Thumbs.db
+
+# ===============================
+# Environment files
+# ===============================
+.env
+application-local.yml
+application-local.properties
+*.properties
+*.yml
