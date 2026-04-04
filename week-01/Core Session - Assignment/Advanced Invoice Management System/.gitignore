@@ -3,6 +3,7 @@ out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 .kotlin
+*.dat
 
 ### Eclipse ###
 .apt_generated
@@ -28,3 +29,13 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### Claude ###
+.claude/
+.claude_sessions/
+claude_sessions/
+CLAUDE.md
+
+### Hidden Folders ###
+.*
+!.gitignore
