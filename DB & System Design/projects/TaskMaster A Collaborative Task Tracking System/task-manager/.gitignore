@@ -4,13 +4,6 @@ target/
 !**/src/test/**/target/
 .kotlin
 
-# Claude / AI tool files
-.claude/
-claude.json
-claude.config.json
-.claude-cache/
-.claude.log
-
 ### IntelliJ IDEA ###
 .idea/modules.xml
 .idea/jarRepositories.xml
