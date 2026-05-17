@@ -15,53 +15,65 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class JobWorker {
 
+    private final JobRescheduler jobRescheduler;
     private final JobRepository jobRepository;
-
     private final JobExecutionLogRepository logRepository;
 
     public void execute(Job job) {
-
+        if (job.getStatus() == JobStatus.CANCELLED) {
+            return;
+        }
         LocalDateTime start = LocalDateTime.now();
 
+        if (job.getNextRunAt() != null &&
+                job.getNextRunAt().isBefore(LocalDateTime.now())) {
+
+            job.setNextRunAt(LocalDateTime.now().plusSeconds(1));
+        }
+
+        int executionNumber = logRepository.getMaxExecutionNumber(job.getId()) + 1;
+
+        // 1. ALWAYS CREATE LOG FIRST (SOURCE OF TRUTH)
         JobExecutionLog log = JobExecutionLog.builder()
                 .job(job)
-                .executionNumber(job.getRetryCount() + 1)
+                .executionNumber(executionNumber)
                 .status(JobStatus.RUNNING)
                 .startedAt(start)
                 .workerInstance("worker-1")
                 .build();
 
+        log = logRepository.save(log);
+
         try {
 
+            // 2. EXECUTE JOB
             performJob(job);
 
             LocalDateTime end = LocalDateTime.now();
+
+            // 3. SUCCESS UPDATE (JOB + LOG)
+            job.setStatus(JobStatus.SUCCESS);
+            job.setLastError(null);
 
             log.setStatus(JobStatus.SUCCESS);
             log.setCompletedAt(end);
             log.setExecutionTimeMs(Duration.between(start, end).toMillis());
 
-            job.setStatus(JobStatus.SUCCESS);
-            job.setLastError(null);
-
-            // only mark success here (NO scheduling logic here)
-            if (Boolean.TRUE.equals(job.getRecurring())) {
-                job.setStatus(JobStatus.SCHEDULED);
-            }
+            // 4. RECURRING HANDLING
+            jobRescheduler.reschedule(job, end);
 
         } catch (Exception e) {
             handleFailure(job, log, e);
         }
 
+        // 5. FINAL PERSIST (BOTH)
         jobRepository.save(job);
         logRepository.save(log);
     }
 
     private void performJob(Job job) {
 
-        // Simulate execution logic
-
-        if (job.getJobType().equals("FAIL_TEST")) {
+        if ("FAIL_TEST".equals(job.getJobType())) {
             throw new RuntimeException("Simulated failure");
         }
 
@@ -80,38 +92,34 @@ public class JobWorker {
         log.setCompletedAt(LocalDateTime.now());
 
         if (job.getRetryCount() < job.getMaxRetries()) {
-
+            long delay = Math.min((long) Math.pow(2, job.getRetryCount()), 300);
             job.setStatus(JobStatus.RETRYING);
+
             job.setNextRunAt(
                     LocalDateTime.now()
-                            .plusSeconds((long) Math.pow(2, job.getRetryCount()))
+                            .plusSeconds(delay)
             );
 
         } else {
-            job.setStatus(JobStatus.DEAD);
+
+            if (Boolean.TRUE.equals(job.getRecurring())) {
+                jobRescheduler.reschedule(job, LocalDateTime.now());
+            } else {
+                job.setStatus(JobStatus.DEAD);
+            }
         }
     }
 
-    private void reschedule(Job job) {
+    private JobExecutionLog createStartLog(Job job, LocalDateTime start) {
 
-        if (job.getCronExpression() != null) {
+        JobExecutionLog log = JobExecutionLog.builder()
+                .job(job)
+                .executionNumber(job.getRetryCount() + 1)
+                .status(JobStatus.RUNNING)
+                .startedAt(start)
+                .workerInstance("worker-1")
+                .build();
 
-            job.setNextRunAt(
-                    CronUtils.next(job.getCronExpression(), LocalDateTime.now())
-            );
-
-            job.setStatus(JobStatus.SCHEDULED);
-        }
-    }
-
-    private void rescheduleRecurringJob(Job job) {
-
-        job.setStatus(JobStatus.SCHEDULED);
-
-        if (job.getCronExpression() != null) {
-            job.setNextRunAt(
-                    LocalDateTime.now().plusMinutes(1) // simplified cron
-            );
-        }
+        return logRepository.save(log);
     }
 }

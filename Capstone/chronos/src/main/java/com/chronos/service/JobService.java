@@ -5,14 +5,17 @@ import com.chronos.entity.Job;
 import com.chronos.entity.User;
 import com.chronos.entity.enums.JobStatus;
 import com.chronos.entity.enums.ScheduleType;
+import com.chronos.exception.InvalidCronExpressionException;
 import com.chronos.exception.ResourceNotFoundException;
 import com.chronos.repository.JobRepository;
 import com.chronos.repository.UserRepository;
+import com.chronos.scheduler.CronUtils;
 import com.chronos.security.SecurityUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.support.CronExpression;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,7 +41,12 @@ public class JobService {
 
         User user = getCurrentUser();
 
+        if (request.getCronExpression() != null) {
+            CronUtils.parseExpression(request.getCronExpression());
+        }
+
         JsonNode payloadNode = null;
+
 
         if (request.getPayload() != null) {
             try {
@@ -149,11 +157,19 @@ public class JobService {
 
     private LocalDateTime resolveNextRunAt(CreateJobRequest request) {
 
-        if (request.getRunAt() != null) {
+        if (request.getScheduleType() == ScheduleType.ONCE) {
+            if (request.getRunAt() == null) {
+                throw new IllegalArgumentException("runAt required for ONCE jobs");
+            }
             return request.getRunAt();
         }
 
-        throw new IllegalArgumentException("runAt required");
+        if (request.getCronExpression() == null) {
+            throw new IllegalArgumentException("cronExpression required for recurring jobs");
+        }
+
+        return CronUtils.next(request.getCronExpression(), LocalDateTime.now());
+
     }
 
     // ---------------- OWNERSHIP ----------------
@@ -213,8 +229,10 @@ public class JobService {
     @Transactional
     public List<Job> claimJobs(LocalDateTime now, int limit) {
 
-        log.info("Claiming jobs: now={}, limit={}", now, limit);
+        List<UUID> ids = jobRepository.claimJobIds(now, limit);
 
-        return jobRepository.claimJobs(now, limit);
+        if (ids.isEmpty()) return List.of();
+
+        return jobRepository.findAllByIds(ids);
     }
 }
