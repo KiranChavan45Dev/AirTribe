@@ -2,6 +2,7 @@ package com.chronos.controller;
 
 import com.chronos.dto.auth.*;
 import com.chronos.service.AuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,14 +15,14 @@ public class AuthController {
 
     @PostMapping("/register")
     public AuthResponse register(
-            @RequestBody RegisterRequest request
+            @Valid @RequestBody RegisterRequest request
     ) {
         return authService.register(request);
     }
 
     @PostMapping("/login")
     public AuthResponse login(
-            @RequestBody LoginRequest request
+            @Valid @RequestBody LoginRequest request
     ) {
         return authService.login(request);
     }

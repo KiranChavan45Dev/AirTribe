@@ -5,6 +5,7 @@ import com.chronos.dto.job.*;
 import com.chronos.service.JobService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -23,7 +24,7 @@ public class JobController {
 
     @Operation(summary = "Create a new job")
     @PostMapping
-    public ApiResponse<JobResponse> createJob(@RequestBody CreateJobRequest request) {
+    public ApiResponse<JobResponse> createJob(@Valid @RequestBody CreateJobRequest request) {
         log.info("API: createJob");
         return ApiResponse.ok("Job created", jobService.createJob(request));
     }
