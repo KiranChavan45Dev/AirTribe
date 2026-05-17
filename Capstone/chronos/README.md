@@ -1,357 +1,610 @@
-# 📌 Chronos — Distributed Job Scheduler
+# Chronos
+
+Distributed Job Scheduler System built with Spring Boot for scheduling, executing, monitoring, and managing background jobs with JWT-based authentication and recurring execution support.
 
 ---
 
-## 🚀 Overview
+# Overview
 
-Chronos is a backend system for scheduling, executing, and managing delayed and recurring jobs. It is built using Java, Spring Boot, and PostgreSQL.
+Chronos is a backend-focused distributed job scheduling platform designed to manage asynchronous and recurring workloads through REST APIs.
 
-It demonstrates core backend engineering concepts like:
+The system supports:
 
-* distributed job execution
-* concurrency control
-* retry mechanisms
-* state management
-* system observability
+* One-time job scheduling
+* Recurring cron-based jobs
+* Retry handling for failed executions
+* Job cancellation and rescheduling
+* Execution logging
+* JWT authentication and authorization
+* Monitoring endpoints
+
+The project demonstrates scalable backend architecture patterns using Spring Boot, PostgreSQL-compatible persistence, transactional job claiming, and concurrent worker execution.
 
 ---
 
-# 🧠 System Architecture
+# Features
 
-## High-Level Design
+* JWT-based authentication
+* Secure REST APIs
+* One-time job scheduling
+* Cron-based recurring jobs
+* Retry and failure handling
+* Job cancellation and rescheduling
+* Execution logging
+* Concurrent worker execution
+* OpenAPI/Swagger documentation
+* Health and metrics monitoring
+* Database migrations with Flyway
 
-```mermaid id="arch1"
+---
+
+# Tech Stack
+
+| Category           | Technology                  |
+| ------------------ | --------------------------- |
+| Backend Framework  | Spring Boot                 |
+| Language           | Java                        |
+| Database           | PostgreSQL                  |
+| ORM                | Spring Data JPA / Hibernate |
+| Security           | Spring Security + JWT       |
+| Scheduler          | Spring Scheduler            |
+| API Documentation  | Swagger / OpenAPI           |
+| Database Migration | Flyway                      |
+| Validation         | Jakarta Validation          |
+| Logging            | SLF4J + Logback             |
+| Build Tool         | Maven                       |
+| Testing            | JUnit, Spring Boot Test     |
+| Concurrency        | ExecutorService             |
+
+---
+
+# Architecture Overview
+
+```mermaid
 flowchart TD
 
-A[Client / API Request] --> B[Spring Boot REST API]
-B --> C[PostgreSQL - Jobs Table]
+Client --> API[REST Controllers]
 
-C --> D[Scheduler Poller<br/>@Scheduled every 5s]
+API --> Security[JWT Security Layer]
 
-D --> E[Fetch Due Jobs<br/>FOR UPDATE SKIP LOCKED]
+Security --> Services[Service Layer]
 
-E --> F[Worker Thread Pool]
+Services --> Scheduler[Job Scheduler]
 
-F --> G[Job Execution Engine]
+Scheduler --> Workers[Job Workers]
 
-G --> H[Update Job Status]
+Workers --> DB[(PostgreSQL)]
 
-G --> I[Execution Logs Table]
+Services --> DB
 
-G --> J{Success or Failure?}
+Workers --> Logs[Execution Logs]
 
-J -->|Success| K[Mark SUCCESS]
-J -->|Failure| L[Retry Engine]
+Workers --> Notifications[Notifications]
 
-L --> M{Retry Count < Max?}
-M -->|Yes| N[RETRYING + Backoff]
-M -->|No| O[DEAD]
+API --> Swagger[OpenAPI Docs]
 ```
 
 ---
 
-# ⚙️ How the System Works
+# Project Structure
 
-## 1. Job Creation
-
-* User submits job via REST API
-* Stored in PostgreSQL with status `SCHEDULED`
-
-## 2. Scheduler Polling
-
-* Background scheduler runs every 5 seconds
-* Fetches due jobs:
-
-    * `next_run_at <= now()`
-    * `status IN (SCHEDULED, RETRYING)`
-
-## 3. Concurrency Safety
-
-* Uses PostgreSQL:
-
-```sql
-FOR UPDATE SKIP LOCKED
+```text
+src/main/java/com/chronos
+├── config
+├── controller
+├── dto
+├── entity
+├── exception
+├── repository
+├── scheduler
+├── security
+├── service
+└── ChronosApplication.java
 ```
 
-* Prevents duplicate job execution across multiple workers
-
-## 4. Execution Flow
-
-* Jobs submitted to worker thread pool
-* Executed asynchronously
+| Folder     | Responsibility                        |
+| ---------- | ------------------------------------- |
+| controller | REST API endpoints                    |
+| service    | Business logic                        |
+| repository | Database access                       |
+| entity     | JPA entities                          |
+| dto        | Request/response models               |
+| scheduler  | Scheduling and worker execution       |
+| security   | JWT authentication and authorization  |
+| exception  | Global exception handling             |
+| config     | OpenAPI and application configuration |
 
 ---
 
-# 🔄 Job State Machine
+# Database Design
 
-```mermaid id="state1"
+## Main Entities
+
+### User
+
+Stores authenticated platform users.
+
+### Job
+
+Represents scheduled jobs with execution metadata and retry state.
+
+### JobExecutionLog
+
+Stores execution history for every job execution attempt.
+
+### Notification
+
+Stores user notifications related to job failures and events.
+
+---
+
+## Entity Relationship Diagram
+
+```mermaid
+erDiagram
+
+USER ||--o{ JOB : owns
+JOB ||--o{ JOB_EXECUTION_LOG : generates
+USER ||--o{ NOTIFICATION : receives
+JOB ||--o{ NOTIFICATION : triggers
+
+USER {
+  UUID id
+  string username
+  string email
+  string passwordHash
+  string role
+}
+
+JOB {
+  UUID id
+  string jobName
+  string jobType
+  string status
+  string cronExpression
+  datetime runAt
+  datetime nextRunAt
+  int retryCount
+  int maxRetries
+  boolean recurring
+}
+
+JOB_EXECUTION_LOG {
+  UUID id
+  string status
+  datetime startedAt
+  datetime completedAt
+  long executionTimeMs
+  string errorMessage
+  string workerInstance
+}
+
+NOTIFICATION {
+  UUID id
+  string type
+  string message
+  boolean read
+}
+```
+
+---
+
+# Authentication & Security
+
+Chronos uses JWT-based stateless authentication.
+
+## Authentication Flow
+
+1. User registers
+2. User logs in
+3. JWT token is generated
+4. Client sends token in Authorization header
+5. JWT filter validates request
+6. SecurityContext is populated
+
+---
+
+## Security Flow
+
+```mermaid
+sequenceDiagram
+
+participant Client
+participant AuthController
+participant AuthService
+participant JWTService
+participant SecurityFilter
+
+Client->>AuthController: POST /auth/login
+AuthController->>AuthService: Authenticate credentials
+AuthService->>JWTService: Generate token
+JWTService-->>AuthService: JWT Token
+AuthService-->>Client: AuthResponse
+
+Client->>SecurityFilter: API Request + Bearer Token
+SecurityFilter->>JWTService: Validate token
+JWTService-->>SecurityFilter: Username
+SecurityFilter-->>Client: Authorized Request
+```
+
+---
+
+# Job Scheduling Flow
+
+Chronos uses a polling scheduler combined with concurrent worker execution.
+
+## Execution Lifecycle
+
+```mermaid
 stateDiagram-v2
 
 [*] --> SCHEDULED
 
-SCHEDULED --> RUNNING
+SCHEDULED --> RUNNING : Claimed by Scheduler
 
-RUNNING --> SUCCESS
-RUNNING --> FAILED
+RUNNING --> SUCCESS : Execution Completed
 
-FAILED --> RETRYING
+RUNNING --> FAILED : Execution Error
+
+FAILED --> RETRYING : Retry Available
+
 RETRYING --> RUNNING
 
-FAILED --> DEAD
+FAILED --> DEAD : Max Retries Exceeded
 
-SCHEDULED --> CANCELLED
+SUCCESS --> SCHEDULED : Recurring Job
+
+DEAD --> [*]
+
+SUCCESS --> [*]
 ```
 
 ---
 
-# 🔁 Retry Mechanism
+# API Documentation
 
-* Each job has `max_retries`
-* On failure:
+## Authentication APIs
 
-    * increment retry count
-    * apply exponential backoff
-
-Example:
-
-```text id="retry1"
-Retry 1 → +1 sec
-Retry 2 → +2 sec
-Retry 3 → +4 sec
-```
-
-If retries exceed limit → job becomes `DEAD`
-
----
-
-# 🔄 Recurring Jobs Flow
-
-```mermaid id="rec1"
-flowchart TD
-
-A[Job Executes] --> B{Is Recurring?}
-B -->|Yes| C[Compute next_run_at]
-C --> D[Set status = SCHEDULED]
-D --> E[Reinsert into Scheduler Cycle]
-
-B -->|No| F[End]
-```
-
----
-
-# 🧱 Database Design
-
-## Tables
-
-* users
-* jobs
-* job_execution_logs
-* notifications
-
----
-
-## Key Design Choice
-
-Instead of Kafka/RabbitMQ:
-
-> PostgreSQL is used as a reliable job queue.
-
-Using:
-
-```sql
-FOR UPDATE SKIP LOCKED
-```
-
-This enables:
-
-* distributed-safe execution
-* no duplicate processing
-* horizontal scalability readiness
-
----
-
-# 📊 Job Execution Lifecycle
-
-```mermaid id="life1"
-flowchart LR
-
-A[CREATE JOB] --> B[SCHEDULED]
-B --> C[RUNNING]
-C --> D{Result}
-
-D -->|Success| E[SUCCESS]
-D -->|Failure| F[FAILED]
-
-F --> G{Retry?}
-G -->|Yes| H[RETRYING]
-H --> C
-G -->|No| I[DEAD]
-```
-
----
-
-# 🔐 Authentication
-
-* JWT-based authentication
-* Stateless Spring Security
-* BCrypt password hashing
-
----
-
-# 📡 API Endpoints
-
-## Auth APIs
-
-```http id="api1"
-POST /auth/register
-POST /auth/login
-```
+| Method | Endpoint         | Description            | Auth Required |
+| ------ | ---------------- | ---------------------- | ------------- |
+| POST   | `/auth/register` | Register user          | No            |
+| POST   | `/auth/login`    | Login and generate JWT | No            |
 
 ---
 
 ## Job APIs
 
-```http id="api2"
-POST   /jobs                 → Create job
-GET    /jobs                 → List user jobs
-GET    /jobs/{id}            → Get job
-DELETE /jobs/{id}           → Cancel job
-PUT    /jobs/{id}/reschedule → Reschedule job
+| Method | Endpoint                | Description    | Auth Required |
+| ------ | ----------------------- | -------------- | ------------- |
+| POST   | `/jobs`                 | Create job     | Yes           |
+| GET    | `/jobs`                 | Get all jobs   | Yes           |
+| GET    | `/jobs/{id}`            | Get job by ID  | Yes           |
+| PUT    | `/jobs/{id}/reschedule` | Reschedule job | Yes           |
+| DELETE | `/jobs/{id}`            | Cancel job     | Yes           |
+
+---
+
+## Monitoring APIs
+
+| Method | Endpoint            | Description      | Auth Required |
+| ------ | ------------------- | ---------------- | ------------- |
+| GET    | `/actuator/health`  | Health status    | No            |
+| GET    | `/actuator/metrics` | Metrics endpoint | No            |
+
+---
+
+# Request & Response Examples
+
+## Register User
+
+### Request
+
+```http
+POST /auth/register
+```
+
+```json
+{
+  "username": "kiran",
+  "email": "kiran@example.com",
+  "password": "Password@123"
+}
 ```
 
 ---
 
-# 🗄️ Database Schema
+## Login
 
-## Core Tables
+### Request
 
-* users
-* jobs
-* job_execution_logs
-* notifications
-
----
-
-# 📊 Observability
-
-Enabled via Spring Actuator:
-
-```text id="obs1"
-/actuator/health
-/actuator/metrics
+```http
+POST /auth/login
 ```
 
-Execution logs stored per job run for traceability.
+```json
+{
+  "username": "kiran",
+  "password": "Password@123"
+}
+```
+
+### Response
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "type": "Bearer"
+}
+```
 
 ---
 
-# 🧱 Tech Stack
+## Create Job
 
-* Java 21
-* Spring Boot
-* Spring Security
-* Spring Data JPA
+### Request
+
+```http
+POST /jobs
+Authorization: Bearer <JWT_TOKEN>
+```
+
+```json
+{
+  "jobName": "Daily Cleanup",
+  "jobType": "DATABASE_CLEANUP",
+  "priority": 5,
+  "maxRetries": 3,
+  "recurring": true,
+  "cronExpression": "0 0 2 * * *"
+}
+```
+
+---
+
+## Success Response
+
+```json
+{
+  "success": true,
+  "message": "Job created",
+  "data": {
+    "id": "job-uuid"
+  }
+}
+```
+
+---
+
+## Error Response
+
+```json
+{
+  "success": false,
+  "message": "Invalid cron expression"
+}
+```
+
+---
+
+# Validation Rules
+
+Detected validations include:
+
+| Field            | Validation             |
+| ---------------- | ---------------------- |
+| username         | Required               |
+| email            | Valid email format     |
+| password         | Required               |
+| jobName          | Required               |
+| priority         | Numeric validation     |
+| maxRetries       | Numeric validation     |
+| cronExpression   | Cron syntax validation |
+| request payloads | `@Valid` validation    |
+
+---
+
+# Setup Instructions
+
+## Prerequisites
+
+* Java 17+
+* Maven
 * PostgreSQL
-* Flyway
-* JWT
 
 ---
 
-# 🚀 Running the Project (NO DOCKER)
+## Clone Repository
 
-## Steps
-
-```bash id="run1"
-1. Create DB:
-   CREATE DATABASE chronos;
-
-2. Update application.yml with DB credentials
-
-3. Run:
-   mvn clean install
-
-4. Start:
-   Run ChronosApplication in IntelliJ
+```bash
+git clone <repository-url>
+cd chronos
 ```
 
 ---
 
-# 🔮 Future Improvements
+## Configure Environment Variables
 
-* Kafka-based event queue
-* Redis distributed locking
-* Cron expression parser (full accuracy)
-* Dead Letter Queue (DLQ)
-* Admin dashboard UI
-* Job timeout recovery system
-* Horizontal worker scaling
-
----
-
-# 🎯 Engineering Highlights
-
-## ✔ Distributed Systems Design
-
-* DB-backed job queue
-* SKIP LOCKED concurrency model
-
-## ✔ Fault Tolerance
-
-* retry mechanism
-* failure state handling
-
-## ✔ Scalability
-
-* stateless workers
-* horizontal scheduler support
-
-## ✔ Production Thinking
-
-* execution logs
-* monitoring hooks
-* clean API design
+```bash
+export DB_URL=jdbc:postgresql://localhost:5432/chronos
+export DB_USERNAME=postgres
+export DB_PASSWORD=postgres
+export JWT_SECRET=your-secret-key
+```
 
 ---
 
-# 🎤 Explainer Video Script
+## Run Database Migrations
 
-## 1. Introduction
-
-> “Chronos is a distributed job scheduler built using Java and Spring Boot…”
+Flyway migrations run automatically during application startup.
 
 ---
 
-## 2. Architecture
+## Start Application
 
-* REST APIs
-* PostgreSQL queue
-* Scheduler polling
-* Worker thread pool
-
----
-
-## 3. Execution Flow
-
-* job lifecycle states
-* success/failure transitions
+```bash
+mvn spring-boot:run
+```
 
 ---
 
-## 4. Concurrency Model
+# Environment Variables
 
-> “Instead of Kafka, we use PostgreSQL row locking with SKIP LOCKED…”
-
----
-
-## 5. Retry System
-
-* exponential backoff
-* max retry limit
+| Variable    | Description             |
+| ----------- | ----------------------- |
+| DB_URL      | Database connection URL |
+| DB_USERNAME | Database username       |
+| DB_PASSWORD | Database password       |
+| JWT_SECRET  | JWT signing secret      |
 
 ---
 
-## 6. Closing
+# Running the Application
 
-> “This system simulates production-grade job scheduling systems with scalability and reliability built in.”
+## Maven
+
+```bash
+mvn clean install
+mvn spring-boot:run
+```
 
 ---
+
+## Swagger UI
+
+```text
+http://localhost:8080/swagger-ui/index.html
+```
+
+---
+
+## Health Endpoint
+
+```text
+http://localhost:8080/actuator/health
+```
+
+---
+
+# Postman Usage
+
+1. Import the Postman collection
+2. Register or login user
+3. Copy generated JWT token
+4. Add token to Authorization header:
+
+```text
+Authorization: Bearer <token>
+```
+
+5. Execute job management APIs
+6. Use Collection Runner for end-to-end workflow testing
+
+---
+
+# Logging & Monitoring
+
+Chronos uses:
+
+* SLF4J logging
+* Structured application logs
+* Spring Boot Actuator endpoints
+
+Execution logs track:
+
+* start time
+* completion time
+* execution duration
+* worker instance
+* execution status
+* error messages
+
+Monitoring endpoints:
+
+* `/actuator/health`
+* `/actuator/metrics`
+
+---
+
+# Design Decisions
+
+## Scheduling Strategy
+
+Spring Scheduler with polling-based job claiming was used to support asynchronous execution and recurring scheduling.
+
+## Security
+
+JWT-based stateless authentication simplifies API authorization and horizontal scalability.
+
+## Retry Strategy
+
+Jobs maintain retry metadata (`retryCount`, `maxRetries`) to support automatic retries and dead-state transitions.
+
+## Scalability
+
+Concurrent job execution is handled using a fixed thread pool executor.
+
+---
+
+# Error Handling
+
+Chronos includes centralized exception handling through a global exception handler.
+
+Handled scenarios include:
+
+* validation failures
+* invalid cron expressions
+* authentication failures
+* authorization failures
+* retry exhaustion
+
+Failed jobs transition to terminal states after retry limits are exceeded.
+
+---
+
+# Scalability Considerations
+
+Implemented scalability patterns include:
+
+* concurrent worker execution
+* polling-based scheduler
+* transactional job claiming
+* retry-based recovery
+* stateless JWT authentication
+* database-backed scheduling persistence
+
+---
+
+# Future Improvements
+
+* Distributed worker coordination
+* Queue-based execution architecture
+* WebSocket-based live monitoring
+* Advanced retry backoff strategies
+* Role-based access control
+* Notification delivery integrations
+* Dashboard UI
+* Kubernetes deployment support
+
+---
+
+# Demo Section
+
+## GitHub Repository
+[AirTribe Capstone Project](https://github.com/KiranChavan45Dev/AirTribe/tree/main/Capstone)
+
+
+## Demo Video
+
+The repository includes demo videos and test result recordings to showcase the working functionality of the system.
+
+📁 Location: `repo/test result`
+
+NOTE: In case the file is not found here, please use the following link: [Demo Video (Google Drive)](https://drive.google.com/drive/folders/1p3o6-JhyJcQzDutERnIvjcYfLt5XvxBd?usp=drive_link)
+
+---
+
+# Author
+
+**Kiran Chavan**
+
+Backend Engineering Capstone Project — Chronos Job Scheduler System
