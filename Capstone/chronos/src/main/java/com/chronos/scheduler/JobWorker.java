@@ -32,9 +32,6 @@ public class JobWorker {
                 .build();
 
         try {
-            // -----------------------------
-            // SIMULATED JOB EXECUTION
-            // -----------------------------
 
             performJob(job);
 
@@ -42,20 +39,17 @@ public class JobWorker {
 
             log.setStatus(JobStatus.SUCCESS);
             log.setCompletedAt(end);
-            log.setExecutionTimeMs(
-                    Duration.between(start, end).toMillis()
-            );
+            log.setExecutionTimeMs(Duration.between(start, end).toMillis());
 
             job.setStatus(JobStatus.SUCCESS);
             job.setLastError(null);
 
-            // recurring job handling
+            // only mark success here (NO scheduling logic here)
             if (Boolean.TRUE.equals(job.getRecurring())) {
-                rescheduleRecurringJob(job);
+                job.setStatus(JobStatus.SCHEDULED);
             }
 
         } catch (Exception e) {
-
             handleFailure(job, log, e);
         }
 
@@ -95,6 +89,18 @@ public class JobWorker {
 
         } else {
             job.setStatus(JobStatus.DEAD);
+        }
+    }
+
+    private void reschedule(Job job) {
+
+        if (job.getCronExpression() != null) {
+
+            job.setNextRunAt(
+                    CronUtils.next(job.getCronExpression(), LocalDateTime.now())
+            );
+
+            job.setStatus(JobStatus.SCHEDULED);
         }
     }
 
