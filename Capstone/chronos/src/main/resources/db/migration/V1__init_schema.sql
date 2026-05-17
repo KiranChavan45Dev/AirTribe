@@ -87,6 +87,8 @@ CREATE TABLE jobs (
 
                       is_recurring BOOLEAN NOT NULL DEFAULT FALSE,
 
+                      version BIGINT NOT NULL DEFAULT 0,
+
                       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
                       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -96,7 +98,6 @@ CREATE TABLE jobs (
                               REFERENCES users(id)
                               ON DELETE CASCADE
 );
-
 -- =========================================================
 -- JOB EXECUTION LOGS
 -- =========================================================
@@ -107,6 +108,8 @@ CREATE TABLE job_execution_logs (
                                     job_id UUID NOT NULL,
 
                                     execution_number INT NOT NULL,
+
+                                    execution_id UUID,
 
                                     status VARCHAR(50) NOT NULL,
 

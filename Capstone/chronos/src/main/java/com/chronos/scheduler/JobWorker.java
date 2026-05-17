@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -20,20 +21,23 @@ public class JobWorker {
     private final JobExecutionLogRepository logRepository;
 
     public void execute(Job job) {
-        if (job.getStatus() == JobStatus.CANCELLED) {
+
+        if (job.getStatus() == JobStatus.CANCELLED ||
+                job.getStatus() == JobStatus.DEAD) {
             return;
         }
+
         LocalDateTime start = LocalDateTime.now();
 
         if (job.getNextRunAt() != null &&
-                job.getNextRunAt().isBefore(LocalDateTime.now())) {
+                job.getNextRunAt().isBefore(start)) {
 
-            job.setNextRunAt(LocalDateTime.now().plusSeconds(1));
+            job.setNextRunAt(start.plusSeconds(1));
         }
 
-        int executionNumber = logRepository.getMaxExecutionNumber(job.getId()) + 1;
+        // FIXED: no DB race condition anymore
+        int executionNumber = job.getRetryCount() + 1;
 
-        // 1. ALWAYS CREATE LOG FIRST (SOURCE OF TRUTH)
         JobExecutionLog log = JobExecutionLog.builder()
                 .job(job)
                 .executionNumber(executionNumber)
@@ -46,12 +50,10 @@ public class JobWorker {
 
         try {
 
-            // 2. EXECUTE JOB
             performJob(job);
 
             LocalDateTime end = LocalDateTime.now();
 
-            // 3. SUCCESS UPDATE (JOB + LOG)
             job.setStatus(JobStatus.SUCCESS);
             job.setLastError(null);
 
@@ -59,14 +61,13 @@ public class JobWorker {
             log.setCompletedAt(end);
             log.setExecutionTimeMs(Duration.between(start, end).toMillis());
 
-            // 4. RECURRING HANDLING
             jobRescheduler.reschedule(job, end);
 
         } catch (Exception e) {
+
             handleFailure(job, log, e);
         }
 
-        // 5. FINAL PERSIST (BOTH)
         jobRepository.save(job);
         logRepository.save(log);
     }
@@ -92,13 +93,11 @@ public class JobWorker {
         log.setCompletedAt(LocalDateTime.now());
 
         if (job.getRetryCount() < job.getMaxRetries()) {
-            long delay = Math.min((long) Math.pow(2, job.getRetryCount()), 300);
-            job.setStatus(JobStatus.RETRYING);
 
-            job.setNextRunAt(
-                    LocalDateTime.now()
-                            .plusSeconds(delay)
-            );
+            long delay = Math.min((long) Math.pow(2, job.getRetryCount()), 300);
+
+            job.setStatus(JobStatus.RETRYING);
+            job.setNextRunAt(LocalDateTime.now().plusSeconds(delay));
 
         } else {
 
@@ -108,18 +107,5 @@ public class JobWorker {
                 job.setStatus(JobStatus.DEAD);
             }
         }
-    }
-
-    private JobExecutionLog createStartLog(Job job, LocalDateTime start) {
-
-        JobExecutionLog log = JobExecutionLog.builder()
-                .job(job)
-                .executionNumber(job.getRetryCount() + 1)
-                .status(JobStatus.RUNNING)
-                .startedAt(start)
-                .workerInstance("worker-1")
-                .build();
-
-        return logRepository.save(log);
     }
 }

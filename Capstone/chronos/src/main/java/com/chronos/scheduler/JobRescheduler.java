@@ -15,25 +15,30 @@ public class JobRescheduler {
     @Transactional
     public void reschedule(Job job, LocalDateTime baseTime) {
 
-        if (!Boolean.TRUE.equals(job.getRecurring())) {
+        if (!Boolean.TRUE.equals(job.getRecurring())) return;
+
+        if (job.getCronExpression() == null) {
+            job.setStatus(JobStatus.DEAD);
+            job.setLastError("Missing cron expression for recurring job");
             return;
         }
 
-        LocalDateTime nextRun;
+        try {
+            LocalDateTime nextRun =
+                    CronUtils.next(job.getCronExpression(), baseTime);
 
-        if (job.getCronExpression() != null) {
-            try {
-                nextRun = CronUtils.next(job.getCronExpression(), baseTime);
-            } catch (Exception e) {
+            if (nextRun == null || nextRun.isBefore(baseTime)) {
                 job.setStatus(JobStatus.DEAD);
-                job.setLastError("Invalid cron: " + e.getMessage());
+                job.setLastError("Invalid cron nextRun calculation");
                 return;
             }
-        } else {
-            nextRun = baseTime.plusMinutes(1);
-        }
 
-        job.setNextRunAt(nextRun);
-        job.setStatus(JobStatus.SCHEDULED);
+            job.setNextRunAt(nextRun);
+            job.setStatus(JobStatus.SCHEDULED);
+
+        } catch (Exception e) {
+            job.setStatus(JobStatus.DEAD);
+            job.setLastError("Cron parsing failed: " + e.getMessage());
+        }
     }
 }

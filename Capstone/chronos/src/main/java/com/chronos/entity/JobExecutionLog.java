@@ -49,4 +49,6 @@ public class JobExecutionLog {
     @CreationTimestamp
     @Column(name = "created_at",nullable = false,updatable = false)
     private LocalDateTime createdAt;
+    @Column(name = "execution_id")
+    private UUID executionId;
 }

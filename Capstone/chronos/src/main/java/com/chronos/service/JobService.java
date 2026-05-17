@@ -42,7 +42,7 @@ public class JobService {
         User user = getCurrentUser();
 
         if (request.getCronExpression() != null) {
-            CronUtils.parseExpression(request.getCronExpression());
+            CronExpression.parse(request.getCronExpression());
         }
 
         JsonNode payloadNode = null;
