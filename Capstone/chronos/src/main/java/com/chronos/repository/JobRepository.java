@@ -5,6 +5,7 @@ import com.chronos.entity.enums.JobStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -15,7 +16,6 @@ import java.util.UUID;
 public interface JobRepository extends JpaRepository<Job, UUID> {
     List<Job> findByUserId(UUID userId);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(value = """
             SELECT * FROM jobs
             WHERE status IN ('SCHEDULED', 'RETRYING')
@@ -29,6 +29,20 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
             @Param("limit") int limit
     );
 
-
+    @Modifying
+    @Query(value = """
+            UPDATE jobs
+            SET status = 'RUNNING'
+            WHERE id IN (
+                SELECT id FROM jobs
+                WHERE status IN ('SCHEDULED', 'RETRYING')
+                  AND next_run_at <= :now
+                ORDER BY priority DESC, next_run_at ASC
+                LIMIT :limit
+                FOR UPDATE SKIP LOCKED
+            )
+            RETURNING *
+            """, nativeQuery = true)
+    List<Job> claimJobs(LocalDateTime now, int limit);
     long countByStatus(JobStatus status);
 }
