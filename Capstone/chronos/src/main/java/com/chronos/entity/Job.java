@@ -4,6 +4,10 @@ import com.chronos.entity.enums.JobStatus;
 import com.chronos.entity.enums.ScheduleType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -31,6 +35,7 @@ public class Job {
     @Column(name = "job_type", nullable = false)
     private String jobType;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String payload;
 
@@ -64,9 +69,11 @@ public class Job {
     @Column(name = "is_recurring")
     private Boolean recurring;
 
-    @Column(name = "created_at")
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 }
