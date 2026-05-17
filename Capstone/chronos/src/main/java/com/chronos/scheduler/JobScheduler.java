@@ -3,6 +3,7 @@ package com.chronos.scheduler;
 import com.chronos.entity.Job;
 import com.chronos.entity.enums.JobStatus;
 import com.chronos.repository.JobRepository;
+import com.chronos.service.JobService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -17,6 +18,7 @@ import java.util.concurrent.ExecutorService;
 @RequiredArgsConstructor
 public class JobScheduler {
 
+    private final JobService jobService;
     private final JobRepository jobRepository;
     private final JobWorker jobWorker;
     private final ExecutorService jobExecutor;
@@ -28,7 +30,7 @@ public class JobScheduler {
     @Scheduled(fixedDelayString = "${scheduler.job-poll-interval}")
     public void pollAndExecuteJobs() {
 
-        List<Job> jobs = jobRepository.findJobsToExecute(
+        List<Job> jobs = jobService.claimJobs(
                 LocalDateTime.now(),
                 10
         );

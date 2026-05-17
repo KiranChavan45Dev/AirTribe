@@ -2,6 +2,7 @@ package com.chronos.dto.job;
 
 import com.chronos.entity.enums.JobStatus;
 import com.chronos.entity.enums.ScheduleType;
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -20,7 +21,7 @@ public class JobResponse {
 
     private String jobType;
 
-    private String payload;
+    private JsonNode payload;
 
     private JobStatus status;
 

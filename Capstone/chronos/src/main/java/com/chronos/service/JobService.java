@@ -9,40 +9,50 @@ import com.chronos.exception.ResourceNotFoundException;
 import com.chronos.repository.JobRepository;
 import com.chronos.repository.UserRepository;
 import com.chronos.security.SecurityUtils;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class JobService {
 
     private final JobRepository jobRepository;
-
     private final UserRepository userRepository;
+    private final ObjectMapper objectMapper;
 
-    public JobResponse createJob(
-            CreateJobRequest request
-    ) {
+    // ---------------- CREATE JOB ----------------
 
-        String username =
-                SecurityUtils.getCurrentUsername();
+    public JobResponse createJob(CreateJobRequest request) {
 
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("User not found"));
+        log.info("Creating job: {}", request.getJobName());
 
-        boolean recurring =
-                request.getScheduleType() != ScheduleType.ONCE;
+        User user = getCurrentUser();
+
+        JsonNode payloadNode = null;
+
+        if (request.getPayload() != null) {
+            try {
+                payloadNode = objectMapper.valueToTree(request.getPayload());
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Invalid JSON payload", e);
+            }
+        }
 
         Job job = Job.builder()
                 .user(user)
                 .jobName(request.getJobName())
                 .jobType(request.getJobType())
-                .payload(request.getPayload())
+                .payload(payloadNode)
                 .status(JobStatus.SCHEDULED)
                 .scheduleType(request.getScheduleType())
                 .cronExpression(request.getCronExpression())
@@ -51,33 +61,25 @@ public class JobService {
                 .retryCount(0)
                 .maxRetries(request.getMaxRetries())
                 .priority(request.getPriority())
-                .recurring(recurring)
+                .recurring(request.getScheduleType() != ScheduleType.ONCE)
                 .build();
+
         validateJob(job);
-        Job savedJob = jobRepository.save(job);
 
-        return mapToResponse(savedJob);
+        Job saved = jobRepository.save(job);
+
+        log.info("Job created with id={}", saved.getId());
+
+        return mapToResponse(saved);
     }
 
-    private void validateJob(Job job) {
-
-        if (job.getNextRunAt() == null) {
-            throw new IllegalStateException("nextRunAt is required but missing");
-        }
-
-        if (job.getRunAt() == null) {
-            throw new IllegalStateException("runAt is required");
-        }
-    }
+    // ---------------- GET MY JOBS ----------------
 
     public List<JobResponse> getMyJobs() {
 
-        String username =
-                SecurityUtils.getCurrentUsername();
+        User user = getCurrentUser();
 
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("User not found"));
+        log.info("Fetching jobs for user={}", user.getUsername());
 
         return jobRepository.findByUserId(user.getId())
                 .stream()
@@ -85,59 +87,105 @@ public class JobService {
                 .toList();
     }
 
+    // ---------------- GET JOB ----------------
+
     public JobResponse getJob(UUID jobId) {
-
-        Job job = getOwnedJob(jobId);
-
-        return mapToResponse(job);
+        return mapToResponse(getOwnedJob(jobId));
     }
+
+    // ---------------- CANCEL JOB ----------------
 
     public void cancelJob(UUID jobId) {
 
         Job job = getOwnedJob(jobId);
+
+        assertCancelable(job);
+
+        log.info("Cancelling job id={} status={}", jobId, job.getStatus());
 
         job.setStatus(JobStatus.CANCELLED);
 
         jobRepository.save(job);
     }
 
+    // ---------------- RESCHEDULE ----------------
+
     public JobResponse rescheduleJob(UUID jobId, RescheduleJobRequest request) {
 
         Job job = getOwnedJob(jobId);
 
-        LocalDateTime nextRun = request.getNextRunAt();
-
-        if (nextRun == null) {
+        if (request.getNextRunAt() == null) {
             throw new IllegalArgumentException("nextRunAt cannot be null");
         }
 
-        job.setNextRunAt(nextRun);
+        log.info("Rescheduling job id={} to {}", jobId, request.getNextRunAt());
+
+        job.setNextRunAt(request.getNextRunAt());
         job.setStatus(JobStatus.SCHEDULED);
 
-        Job updated = jobRepository.save(job);
-
-        return mapToResponse(updated);
+        return mapToResponse(jobRepository.save(job));
     }
+
+    // ---------------- VALIDATION ----------------
+
+    private void validateJob(Job job) {
+
+        if (job.getNextRunAt() == null) {
+            throw new IllegalStateException("nextRunAt is required");
+        }
+
+        if (job.getScheduleType() == ScheduleType.ONCE && job.getRunAt() == null) {
+            throw new IllegalStateException("runAt required for ONCE jobs");
+        }
+
+        if (job.getMaxRetries() == null) {
+            throw new IllegalStateException("maxRetries is required");
+        }
+
+        if (job.getPriority() == null) {
+            throw new IllegalStateException("priority is required");
+        }
+    }
+
+    private LocalDateTime resolveNextRunAt(CreateJobRequest request) {
+
+        if (request.getRunAt() != null) {
+            return request.getRunAt();
+        }
+
+        throw new IllegalArgumentException("runAt required");
+    }
+
+    // ---------------- OWNERSHIP ----------------
 
     private Job getOwnedJob(UUID jobId) {
 
-        String username =
-                SecurityUtils.getCurrentUsername();
-
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("User not found"));
+        User user = getCurrentUser();
 
         Job job = jobRepository.findById(jobId)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Job not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
 
         if (!job.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("Unauthorized access");
+            throw new AccessDeniedException("Unauthorized access");
         }
 
         return job;
     }
+
+    private User getCurrentUser() {
+        String username = SecurityUtils.getCurrentUsername();
+
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    private void assertCancelable(Job job) {
+        if (job.getStatus() == JobStatus.RUNNING) {
+            throw new IllegalStateException("Cannot cancel running job");
+        }
+    }
+
+    // ---------------- MAPPER ----------------
 
     private JobResponse mapToResponse(Job job) {
 
@@ -145,7 +193,7 @@ public class JobService {
                 .id(job.getId())
                 .jobName(job.getJobName())
                 .jobType(job.getJobType())
-                .payload(job.getPayload())
+                .payload(job.getPayload()) // FIXED
                 .status(job.getStatus())
                 .scheduleType(job.getScheduleType())
                 .cronExpression(job.getCronExpression())
@@ -160,12 +208,13 @@ public class JobService {
                 .build();
     }
 
-    private LocalDateTime resolveNextRunAt(CreateJobRequest request) {
+    // ---------------- SCHEDULER SUPPORT ----------------
 
-        if (request.getRunAt() != null) {
-            return request.getRunAt();
-        }
+    @Transactional
+    public List<Job> claimJobs(LocalDateTime now, int limit) {
 
-        throw new IllegalArgumentException("runAt is required for schedule type " + request.getScheduleType());
+        log.info("Claiming jobs: now={}, limit={}", now, limit);
+
+        return jobRepository.claimJobs(now, limit);
     }
 }

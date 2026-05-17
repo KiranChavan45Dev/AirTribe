@@ -2,6 +2,7 @@ package com.chronos.entity;
 
 import com.chronos.entity.enums.JobStatus;
 import com.chronos.entity.enums.ScheduleType;
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -26,7 +27,7 @@ public class Job {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @Column(name = "job_name", nullable = false)
@@ -37,7 +38,7 @@ public class Job {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
-    private String payload;
+    private JsonNode payload;
 
     @Enumerated(EnumType.STRING)
     private JobStatus status;
@@ -52,7 +53,7 @@ public class Job {
     @Column(name = "run_at")
     private LocalDateTime runAt;
 
-    @Column(name = "next_run_at")
+    @Column(name = "next_run_at", nullable = false)
     private LocalDateTime nextRunAt;
 
     @Column(name = "retry_count")
@@ -70,10 +71,8 @@ public class Job {
     private Boolean recurring;
 
     @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 }
