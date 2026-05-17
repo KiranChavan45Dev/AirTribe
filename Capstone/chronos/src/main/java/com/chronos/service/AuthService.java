@@ -6,11 +6,13 @@ import com.chronos.entity.enums.UserRole;
 import com.chronos.repository.UserRepository;
 import com.chronos.security.JwtService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -27,6 +29,12 @@ public class AuthService {
             RegisterRequest request
     ) {
 
+        log.info(
+                "User registration started | username={} | email={}",
+                request.getUsername(),
+                request.getEmail()
+        );
+
         User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
@@ -38,10 +46,26 @@ public class AuthService {
                 .role(UserRole.USER)
                 .build();
 
+        log.debug(
+                "User entity created | username={}",
+                request.getUsername()
+        );
+
         userRepository.save(user);
+
+        log.info(
+                "User saved successfully | userId={} | username={}",
+                user.getId(),
+                user.getUsername()
+        );
 
         String token =
                 jwtService.generateToken(user.getUsername());
+
+        log.debug(
+                "JWT token generated for registered user | username={}",
+                user.getUsername()
+        );
 
         return new AuthResponse(token);
     }
@@ -50,6 +74,11 @@ public class AuthService {
             LoginRequest request
     ) {
 
+        log.info(
+                "Authentication request received | username={}",
+                request.getUsername()
+        );
+
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         request.getUsername(),
@@ -57,8 +86,18 @@ public class AuthService {
                 )
         );
 
+        log.info(
+                "Authentication successful | username={}",
+                request.getUsername()
+        );
+
         String token =
                 jwtService.generateToken(request.getUsername());
+
+        log.debug(
+                "JWT token generated after login | username={}",
+                request.getUsername()
+        );
 
         return new AuthResponse(token);
     }

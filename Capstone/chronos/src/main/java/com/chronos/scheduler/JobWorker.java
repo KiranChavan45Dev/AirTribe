@@ -6,15 +6,18 @@ import com.chronos.entity.enums.JobStatus;
 import com.chronos.repository.JobExecutionLogRepository;
 import com.chronos.repository.JobRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class JobWorker {
+
+    private static final String WORKER_INSTANCE = "worker-1";
 
     private final JobRescheduler jobRescheduler;
     private final JobRepository jobRepository;
@@ -22,8 +25,23 @@ public class JobWorker {
 
     public void execute(Job job) {
 
+        log.info(
+                "Job execution started | jobId={} | jobType={} | status={} | retryCount={}",
+                job.getId(),
+                job.getJobType(),
+                job.getStatus(),
+                job.getRetryCount()
+        );
+
         if (job.getStatus() == JobStatus.CANCELLED ||
                 job.getStatus() == JobStatus.DEAD) {
+
+            log.warn(
+                    "Skipping job execution due to terminal state | jobId={} | status={}",
+                    job.getId(),
+                    job.getStatus()
+            );
+
             return;
         }
 
@@ -32,65 +50,110 @@ public class JobWorker {
         if (job.getNextRunAt() != null &&
                 job.getNextRunAt().isBefore(start)) {
 
+            log.debug(
+                    "Adjusting stale nextRunAt timestamp | jobId={} | previousNextRunAt={}",
+                    job.getId(),
+                    job.getNextRunAt()
+            );
+
             job.setNextRunAt(start.plusSeconds(1));
         }
 
         // FIXED: no DB race condition anymore
         int executionNumber = job.getRetryCount() + 1;
 
-        JobExecutionLog log = JobExecutionLog.builder()
+        JobExecutionLog logEntity = JobExecutionLog.builder()
                 .job(job)
                 .executionNumber(executionNumber)
                 .status(JobStatus.RUNNING)
                 .startedAt(start)
-                .workerInstance("worker-1")
+                .workerInstance(WORKER_INSTANCE)
                 .build();
 
-        log = logRepository.save(log);
+        logEntity = logRepository.save(logEntity);
+
+        log.info(
+                "Execution log created | jobId={} | executionNumber={} | worker={}",
+                job.getId(),
+                executionNumber,
+                WORKER_INSTANCE
+        );
 
         try {
 
             performJob(job);
 
             LocalDateTime end = LocalDateTime.now();
+            long executionTime = Duration.between(start, end).toMillis();
 
             job.setStatus(JobStatus.SUCCESS);
             job.setLastError(null);
 
-            log.setStatus(JobStatus.SUCCESS);
-            log.setCompletedAt(end);
-            log.setExecutionTimeMs(Duration.between(start, end).toMillis());
+            logEntity.setStatus(JobStatus.SUCCESS);
+            logEntity.setCompletedAt(end);
+            logEntity.setExecutionTimeMs(executionTime);
 
             jobRescheduler.reschedule(job, end);
 
+            log.info(
+                    "Job executed successfully | jobId={} | executionNumber={} | executionTimeMs={}",
+                    job.getId(),
+                    executionNumber,
+                    executionTime
+            );
+
         } catch (Exception e) {
 
-            handleFailure(job, log, e);
+            log.error(
+                    "Job execution failed | jobId={} | executionNumber={} | error={}",
+                    job.getId(),
+                    executionNumber,
+                    e.getMessage(),
+                    e
+            );
+
+            handleFailure(job, logEntity, e);
         }
 
         jobRepository.save(job);
-        logRepository.save(log);
+        logRepository.save(logEntity);
+
+        log.info(
+                "Job persistence completed | jobId={} | finalStatus={} | nextRunAt={}",
+                job.getId(),
+                job.getStatus(),
+                job.getNextRunAt()
+        );
     }
 
     private void performJob(Job job) {
+
+        log.debug(
+                "Performing job logic | jobId={} | jobType={}",
+                job.getId(),
+                job.getJobType()
+        );
 
         if ("FAIL_TEST".equals(job.getJobType())) {
             throw new RuntimeException("Simulated failure");
         }
 
-        System.out.println("Executing job: " + job.getJobName());
+        log.debug(
+                "Job logic execution completed | jobId={}",
+                job.getId()
+        );
     }
 
     private void handleFailure(Job job,
-                               JobExecutionLog log,
+                               JobExecutionLog logEntity,
                                Exception e) {
 
         job.setRetryCount(job.getRetryCount() + 1);
         job.setLastError(e.getMessage());
 
-        log.setStatus(JobStatus.FAILED);
-        log.setErrorMessage(e.getMessage());
-        log.setCompletedAt(LocalDateTime.now());
+        logEntity.setStatus(JobStatus.FAILED);
+        logEntity.setErrorMessage(e.getMessage());
+        logEntity.setCompletedAt(LocalDateTime.now());
 
         if (job.getRetryCount() < job.getMaxRetries()) {
 
@@ -99,12 +162,34 @@ public class JobWorker {
             job.setStatus(JobStatus.RETRYING);
             job.setNextRunAt(LocalDateTime.now().plusSeconds(delay));
 
+            log.warn(
+                    "Job scheduled for retry | jobId={} | retryCount={} | maxRetries={} | retryDelaySeconds={}",
+                    job.getId(),
+                    job.getRetryCount(),
+                    job.getMaxRetries(),
+                    delay
+            );
+
         } else {
 
             if (Boolean.TRUE.equals(job.getRecurring())) {
+
+                log.warn(
+                        "Max retries exhausted for recurring job, rescheduling | jobId={}",
+                        job.getId()
+                );
+
                 jobRescheduler.reschedule(job, LocalDateTime.now());
+
             } else {
+
                 job.setStatus(JobStatus.DEAD);
+
+                log.error(
+                        "Job marked as DEAD after exhausting retries | jobId={} | retryCount={}",
+                        job.getId(),
+                        job.getRetryCount()
+                );
             }
         }
     }
